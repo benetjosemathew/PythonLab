@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Python Lab Portal</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --card: #ffffff;
+    --border: #e2e4e9;
+    --text: #1c1e21;
+    --muted: #6b7280;
+    --accent: #2f6feb;
+    --accent-dark: #1f4fb0;
+    --ok: #1a7f37;
+    --ok-bg: #ddf4e4;
+    --err: #b3261e;
+    --err-bg: #fbe9e7;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 24px 16px 64px;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; }
+  .top {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+  .top h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  .top p { color: var(--muted); margin: 0; font-size: 0.95rem; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 22px;
+    margin-bottom: 18px;
+  }
+  .card h2 {
+    font-size: 1.05rem;
+    margin: 0 0 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card .step-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.8rem;
+    flex: none;
+  }
+  .card p.desc { color: var(--muted); font-size: 0.88rem; margin: 0 0 14px; }
+  label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 6px; }
+  select, input[type=file] {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.95rem;
+    background: #fff;
+    color: var(--text);
+  }
+  select:disabled, input:disabled, button:disabled { opacity: 0.55; cursor: not-allowed; }
+  button {
+    margin-top: 14px;
+    width: 100%;
+    padding: 11px 14px;
+    border: none;
+    border-radius: 8px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:hover:not(:disabled) { background: var(--accent-dark); }
+  .status {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 0.87rem;
+    display: none;
+  }
+  .status.ok { display: block; background: var(--ok-bg); color: var(--ok); }
+  .status.err { display: block; background: var(--err-bg); color: var(--err); }
+  .status.info { display: block; background: #eef2ff; color: #3730a3; }
+  .file-name { margin-top: 8px; font-size: 0.82rem; color: var(--muted); }
+  .config-note { text-align: center; font-size: 0.78rem; color: var(--muted); margin-top: 30px; }
+  td { padding: 6px 4px; border-bottom: 1px solid var(--border); vertical-align: top; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="top">
+    <h1 id="examTitle">Python Lab Portal</h1>
+    <p id="examSubtitle">Loading exercise details…</p>
+  </div>
+
+  <div class="card">
+    <h2><span class="step-num">•</span> Who are you?</h2>
+    <p class="desc">Select your name from the list. This selection is used for both steps below.</p>
+    <label for="studentSelect">Name &lt;email&gt;</label>
+    <select id="studentSelect">
+      <option value="">Loading student list…</option>
+    </select>
+    <div class="status" id="rosterStatus"></div>
+  </div>
+
+  <div class="card" id="rubricCard" style="display:none;">
+    <h2><span class="step-num">i</span> Grading rubric</h2>
+    <p class="desc">This is how your submission will be graded.</p>
+    <div id="rubricTable"></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="step-num">1</span> Download your question set</h2>
+    <p class="desc">Downloads a Jupyter notebook (.ipynb) with your personal set of questions. Open it in Jupyter Lab.</p>
+    <button id="downloadBtn" disabled>Download my notebook</button>
+    <div class="status" id="downloadStatus"></div>
+  </div>
+
+  <div class="card">
+    <h2><span class="step-num">2</span> Submit your solved notebook</h2>
+    <p class="desc">Once internet access is restored, select your solved .ipynb file and submit.</p>
+    <label for="fileInput">Solved notebook (.ipynb)</label>
+    <input type="file" id="fileInput" accept=".ipynb" disabled>
+    <div class="file-name" id="fileName"></div>
+    <button id="uploadBtn" disabled>Submit my notebook</button>
+    <div class="status" id="uploadStatus"></div>
+  </div>
+
+  <p class="config-note">Exercise ID: <span id="exIdLabel">—</span></p>
+</div>
+
+<script>
+// ======================= CONFIG (edit per exercise) =======================
+const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxxBMdL8avDiA1dYTYTWzz7N3fFmA_1G6XcXxG4s0OBHepA5Lh3aacmY6kyAb34bnGW/exec";
+let EXERCISE_ID = null;
+
+let students = [];
+let examConfig = null;
+
+function setStatus(el, type, msg) {
+  el.className = "status " + type;
+  el.textContent = msg;
+}
+
+const select = document.getElementById("studentSelect");
+const rosterStatus = document.getElementById("rosterStatus");
+
+// ---- Resolve which exercise is current, then load everything else ----
+fetch(`${WEBAPP_URL}?action=getCurrentExercise`)
+  .then(r => r.json())
+  .then(cfg => {
+    if (cfg.error) throw new Error(cfg.error);
+    examConfig = cfg;
+    EXERCISE_ID = cfg.exercise_id;
+    document.getElementById("exIdLabel").textContent = EXERCISE_ID;
+    document.getElementById("examTitle").textContent = cfg.exercise_name || "Python Lab Portal";
+    document.getElementById("examSubtitle").textContent =
+      `Duration: ${cfg.duration_minutes} minutes · ${cfg.num_questions} questions`;
+    loadRubric();
+    loadRoster();
+  })
+  .catch(err => {
+    document.getElementById("examSubtitle").textContent = "No active exercise right now — check back later.";
+    select.innerHTML = '<option value="">No active exercise</option>';
+    console.error(err);
+  });
+
+function loadRubric() {
+  fetch(`${WEBAPP_URL}?action=getRubric&exercise_id=${encodeURIComponent(EXERCISE_ID)}`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.error || !data.criteria || !data.criteria.length) return;
+      const card = document.getElementById("rubricCard");
+      const rows = data.criteria.map(c =>
+        `<tr><td>${c.criterion}</td><td>${c.description}</td><td>${c.max_points}</td></tr>`
+      ).join("");
+      document.getElementById("rubricTable").innerHTML =
+        `<table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
+          <thead><tr style="text-align:left;border-bottom:1px solid var(--border);">
+            <th style="padding:6px 4px;">Criterion</th><th style="padding:6px 4px;">Description</th><th style="padding:6px 4px;">Points</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+      card.style.display = "block";
+    })
+    .catch(() => {});
+}
+
+function loadRoster() {
+  fetch(`${WEBAPP_URL}?action=getRoster&exercise_id=${encodeURIComponent(EXERCISE_ID)}`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) throw new Error(data.error);
+      students = data.students || [];
+      select.innerHTML = '<option value="">-- Select your name --</option>' +
+        students.map(s => `<option value="${s.email}">${s.name} &lt;${s.email}&gt;</option>`).join("");
+    })
+    .catch(err => {
+      setStatus(rosterStatus, "err", "Could not load student list: " + err.message);
+      select.innerHTML = '<option value="">Failed to load</option>';
+    });
+}
+
+select.addEventListener("change", () => {
+  const hasSelection = !!select.value;
+  document.getElementById("downloadBtn").disabled = !hasSelection;
+  document.getElementById("fileInput").disabled = !hasSelection;
+  document.getElementById("uploadBtn").disabled = !hasSelection || !document.getElementById("fileInput").files.length;
+});
+
+// ---- Step 1: Download ----
+document.getElementById("downloadBtn").addEventListener("click", () => {
+  const email = select.value;
+  const btn = document.getElementById("downloadBtn");
+  const statusEl = document.getElementById("downloadStatus");
+  if (!email) return;
+
+  btn.disabled = true;
+  setStatus(statusEl, "info", "Fetching your question set…");
+
+  fetch(`${WEBAPP_URL}?action=getQuestions&email=${encodeURIComponent(email)}&exercise_id=${encodeURIComponent(EXERCISE_ID)}`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) throw new Error(data.error);
+      const notebook = buildNotebook(data);
+      const filename = `${data.roll_no}_${EXERCISE_ID}.ipynb`;
+      downloadFile(filename, JSON.stringify(notebook, null, 1));
+      setStatus(statusEl, "ok", `Downloaded ${filename}. Open it in Jupyter Lab to begin.`);
+    })
+    .catch(err => {
+      setStatus(statusEl, "err", "Could not download your set: " + err.message);
+    })
+    .finally(() => { btn.disabled = false; });
+});
+
+function buildNotebook(data) {
+  const cells = [];
+
+  cells.push(mdCell(
+    `# Python Lab Exercise — ${data.exercise_name}\n` +
+    `**Instructions:**\n` +
+    `- Fill in your code in the empty code cell below each question.\n` +
+    `- Some questions require the \`math\` library — remember to \`import math\` where needed.\n` +
+    `- Use \`print()\` or f-strings to display your final answer(s), formatted/rounded exactly as asked.\n` +
+    `- Question 0 is a worked example — refer to it for syntax if you get stuck.\n` +
+    `- You have **${data.duration_minutes} minutes**. Save your notebook before uploading.\n` +
+    `- Do not rename this file. Do not use the internet during the exam.\n\n` +
+    `**Name:** ${data.name}  \n**Roll No:** ${data.roll_no}`
+  ));
+
+  const hasCustomWorked = data.worked_example_text && data.worked_example_code;
+  cells.push(mdCell(
+    "### Question 0 (Worked Example — not graded)\n" +
+    (hasCustomWorked ? data.worked_example_text :
+      "A square plot of land has a side length of 18.5 m. Calculate its area, perimeter, " +
+      "and diagonal length (diagonal = side × √2, using `math.sqrt()`). Display all three " +
+      "rounded to 2 decimal places.")
+  ));
+  cells.push(codeCell(
+    hasCustomWorked ? data.worked_example_code :
+      "import math\n\n" +
+      "# Given\n" +
+      "side = 18.5\n\n" +
+      "# Calculate area, perimeter, and diagonal\n" +
+      "area = side ** 2\n" +
+      "perimeter = 4 * side\n" +
+      "diagonal = side * math.sqrt(2)\n\n" +
+      "# Display results\n" +
+      'print(f"The area of the plot is {area:.2f} sq m")\n' +
+      'print(f"The perimeter of the plot is {perimeter:.2f} m")\n' +
+      'print(f"The diagonal of the plot is {diagonal:.2f} m")'
+  ));
+
+  data.questions.forEach(q => {
+    cells.push(mdCell(`### Question ${q.question_number}\n**[${q.category}]** ${q.question_text}`));
+    cells.push(codeCell("# Write your solution here\n"));
+  });
+
+  return {
+    nbformat: 4,
+    nbformat_minor: 0,
+    metadata: {
+      colab: { provenance: [] },
+      kernelspec: { name: "python3", display_name: "Python 3" },
+      language_info: { name: "python" }
+    },
+    cells: cells
+  };
+}
+
+function mdCell(text) {
+  return { cell_type: "markdown", metadata: {}, source: splitSource(text) };
+}
+function codeCell(text) {
+  return { cell_type: "code", execution_count: null, metadata: {}, outputs: [], source: splitSource(text) };
+}
+function splitSource(text) {
+  const lines = text.split("\n");
+  const src = lines.slice(0, -1).map(l => l + "\n");
+  if (lines[lines.length - 1] !== "") src.push(lines[lines.length - 1]);
+  return src;
+}
+function downloadFile(filename, content) {
+  const blob = new Blob([content], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ---- Step 2: Upload ----
+const fileInput = document.getElementById("fileInput");
+const fileNameEl = document.getElementById("fileName");
+const uploadBtn = document.getElementById("uploadBtn");
+
+fileInput.addEventListener("change", () => {
+  const f = fileInput.files[0];
+  fileNameEl.textContent = f ? `Selected: ${f.name}` : "";
+  uploadBtn.disabled = !f || !select.value;
+});
+
+uploadBtn.addEventListener("click", () => {
+  const email = select.value;
+  const file = fileInput.files[0];
+  const statusEl = document.getElementById("uploadStatus");
+  if (!email || !file) return;
+
+  uploadBtn.disabled = true;
+  setStatus(statusEl, "info", "Uploading…");
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    const notebookText = reader.result;
+    fetch(WEBAPP_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        action: "submit",
+        email: email,
+        exercise_id: EXERCISE_ID,
+        filename: file.name,
+        notebook_json: notebookText
+      })
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) throw new Error(data.error);
+        setStatus(statusEl, "ok", `Submitted successfully at ${new Date(data.submitted_at).toLocaleTimeString()}.`);
+      })
+      .catch(err => {
+        setStatus(statusEl, "err", "Submission failed: " + err.message);
+      })
+      .finally(() => { uploadBtn.disabled = false; });
+  };
+  reader.onerror = () => {
+    setStatus(statusEl, "err", "Could not read the selected file.");
+    uploadBtn.disabled = false;
+  };
+  reader.readAsText(file);
+});
+</script>
+</body>
+</html>

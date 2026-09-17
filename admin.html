@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lab Exercise Admin</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --card: #ffffff; --border: #e2e4e9; --text: #1c1e21;
+    --muted: #6b7280; --accent: #2f6feb; --accent-dark: #1f4fb0;
+    --ok: #1a7f37; --ok-bg: #ddf4e4; --err: #b3261e; --err-bg: #fbe9e7;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg); color:var(--text); padding:24px 16px 64px; }
+  .wrap { max-width: 820px; margin: 0 auto; }
+  h1 { font-size:1.4rem; margin:0 0 4px; }
+  .top p { color:var(--muted); margin:0 0 24px; font-size:0.9rem; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:20px 22px; margin-bottom:18px; }
+  .card h2 { font-size:1.05rem; margin:0 0 4px; }
+  .card p.desc { color:var(--muted); font-size:0.85rem; margin:0 0 14px; }
+  label { display:block; font-size:0.82rem; font-weight:600; margin:10px 0 5px; }
+  input[type=text], input[type=number], input[type=password], textarea, select {
+    width:100%; padding:9px 11px; border:1px solid var(--border); border-radius:8px;
+    font-size:0.9rem; font-family:inherit; background:#fff; color:var(--text);
+  }
+  textarea { min-height:110px; font-family: ui-monospace, monospace; font-size:0.8rem; }
+  .row { display:flex; gap:10px; }
+  .row > div { flex:1; }
+  button { margin-top:14px; padding:10px 16px; border:none; border-radius:8px;
+    background:var(--accent); color:#fff; font-size:0.9rem; font-weight:600; cursor:pointer; }
+  button:hover:not(:disabled) { background:var(--accent-dark); }
+  button.secondary { background:#fff; color:var(--accent); border:1px solid var(--accent); }
+  button.big { display:block; width:100%; padding:18px; font-size:1.05rem; margin-bottom:12px; }
+  button:disabled { opacity:0.5; cursor:not-allowed; }
+  .status { margin-top:10px; padding:9px 11px; border-radius:8px; font-size:0.85rem; display:none; white-space:pre-wrap; }
+  .status.ok { display:block; background:var(--ok-bg); color:var(--ok); }
+  .status.err { display:block; background:var(--err-bg); color:var(--err); }
+  .status.info { display:block; background:#eef2ff; color:#3730a3; }
+  .log { margin-top:10px; padding:10px 12px; border-radius:8px; background:#f8f9fb; border:1px solid var(--border);
+    font-size:0.8rem; font-family: ui-monospace, monospace; white-space:pre-wrap; display:none; max-height:220px; overflow:auto; }
+  table { width:100%; border-collapse:collapse; font-size:0.83rem; margin-top:8px; }
+  td, th { padding:6px 4px; border-bottom:1px solid var(--border); text-align:left; vertical-align:top; }
+  .prompt-block { border:1px solid var(--border); border-radius:8px; padding:12px; margin-top:10px; }
+  .prompt-block h3 { margin:0 0 6px; font-size:0.9rem; }
+  .prompt-block pre { white-space:pre-wrap; font-size:0.76rem; background:#f8f9fb; padding:10px; border-radius:6px; max-height:280px; overflow:auto; }
+  .backBtn { background:#fff; color:var(--muted); border:1px solid var(--border); padding:6px 12px; font-size:0.82rem; font-weight:500; margin-bottom:14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h1>Lab Exercise — Admin</h1>
+    <p>Create exercises with fresh scenarios and rubrics, or generate grading prompts from submissions.</p>
+  </div>
+
+  <!-- ===================== SCREEN: PASSWORD ===================== -->
+  <div class="card" id="screenPassword">
+    <h2>Admin Access</h2>
+    <p class="desc">Kept only in this browser tab for this session — never saved to the page.</p>
+    <label for="webappUrl">Web App URL</label>
+    <input type="text" id="webappUrl" value="https://script.google.com/macros/s/AKfycbxxBMdL8avDiA1dYTYTWzz7N3fFmA_1G6XcXxG4s0OBHepA5Lh3aacmY6kyAb34bnGW/exec">
+    <label for="pwInput">Password</label>
+    <input type="password" id="pwInput" placeholder="Enter admin key">
+    <button id="pwSubmit">Enter</button>
+    <div class="status" id="pwStatus"></div>
+  </div>
+
+  <!-- ===================== SCREEN: MENU ===================== -->
+  <div class="card" id="screenMenu" style="display:none;">
+    <h2>What would you like to do?</h2>
+    <button class="big" id="goCreate">Create New Exercise</button>
+    <button class="big secondary" id="goGrading">Grading Prompts</button>
+  </div>
+
+  <!-- ===================== SCREEN: CREATE ===================== -->
+  <div id="screenCreate" style="display:none;">
+    <button class="backBtn" id="backFromCreate">&larr; Back</button>
+
+    <div class="card">
+      <h2>New exercise</h2>
+      <div class="row">
+        <div><label>Exercise name</label><input type="text" id="exName" value="Python Lab Exercise"></div>
+        <div><label>Duration (minutes)</label><input type="number" id="exDuration" value="60"></div>
+      </div>
+      <label>Number of graded questions per student</label>
+      <input type="number" id="exNumQuestions" value="9">
+    </div>
+
+    <div class="card">
+      <h2>Step 1 — Generate scenarios &amp; rubric from your class content</h2>
+      <p class="desc">Copy this prompt, paste it into any AI along with your class notes/notebook, then paste the two JSON blocks it returns below.</p>
+      <label>Bank size (number of scenarios to generate)</label>
+      <input type="number" id="bankSizeInput" value="150">
+      <div class="prompt-block">
+        <pre id="genPromptText"></pre>
+        <button class="secondary" id="copyPromptBtn">Copy prompt</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Step 2 — Paste the generated content</h2>
+      <label>Scenario bank JSON</label>
+      <input type="file" id="bankFile" accept=".json">
+      <textarea id="bankText" placeholder='[{"category":"...","question_text":"..."}]'></textarea>
+      <label>Rubric JSON</label>
+      <input type="file" id="rubricFile" accept=".json">
+      <textarea id="rubricText" placeholder='[{"criterion":"...","description":"...","max_points":5}]'></textarea>
+      <label>Worked example JSON (one object, not an array)</label>
+      <input type="file" id="workedFile" accept=".json">
+      <textarea id="workedText" placeholder='{"question_text":"...","solution_code":"..."}'></textarea>
+      <label>Max scenario overlap allowed between any two students</label>
+      <input type="number" id="maxOverlap" value="2">
+    </div>
+
+    <div class="card">
+      <h2>Step 3 — Create</h2>
+      <p class="desc">This will: save the exercise (marking it current), auto-enroll every student from the master list, upload the bank &amp; rubric, and generate + push each student's question set — question numbers and sets are assigned automatically.</p>
+      <button id="createAllBtn">Create exercise</button>
+      <div class="status" id="createStatus"></div>
+      <div class="log" id="createLog"></div>
+    </div>
+  </div>
+
+  <!-- ===================== SCREEN: GRADING ===================== -->
+  <div id="screenGrading" style="display:none;">
+    <button class="backBtn" id="backFromGrading">&larr; Back</button>
+
+    <div class="card">
+      <h2>Grading prompts</h2>
+      <p class="desc">Builds one AI-grading prompt per submission, combining that exercise's rubric and each student's assigned questions with their submitted code.</p>
+      <label>Exercise</label>
+      <select id="gradeExerciseSelect"><option value="">Loading exercises…</option></select>
+      <button class="secondary" id="setCurrentBtn">Set selected exercise as current</button>
+      <button id="buildPromptsBtn">Build grading prompts</button>
+      <div class="status" id="promptStatus"></div>
+      <div id="promptsOutput"></div>
+    </div>
+
+    <div class="card">
+      <h2>Fix: re-run enrollment</h2>
+      <p class="desc">If students are missing from student-portal.html's dropdown, the Students tab likely wasn't filled in before this exercise was created. This re-copies everyone currently in Students into the selected exercise's Roster — it does NOT assign question sets to newly added students, so run "Generate & push assignments" again afterward if anyone new was added.</p>
+      <button class="secondary" id="reEnrollBtn">Re-enroll all students for selected exercise</button>
+      <button class="secondary" id="assignMissingBtn">Assign question sets to newly enrolled students</button>
+      <div class="status" id="reEnrollStatus"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let ADMIN_KEY = "";
+function webappUrl() { return document.getElementById("webappUrl").value.trim(); }
+function setStatus(el, type, msg) { el.className = "status " + type; el.textContent = msg; }
+function log(el, msg) { el.style.display = "block"; el.textContent += msg + "\n"; }
+
+function get(action, extraParams) {
+  const params = new URLSearchParams({ action, admin_key: ADMIN_KEY, ...(extraParams || {}) });
+  return fetch(`${webappUrl()}?${params.toString()}`).then(r => r.json());
+}
+function post(body) {
+  return fetch(webappUrl(), {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ ...body, admin_key: ADMIN_KEY })
+  }).then(r => r.json());
+}
+
+// ---- Screen navigation ----
+function showScreen(id) {
+  ["screenPassword", "screenMenu", "screenCreate", "screenGrading"].forEach(s => {
+    document.getElementById(s).style.display = (s === id) ? "block" : "none";
+  });
+}
+
+document.getElementById("pwSubmit").addEventListener("click", () => {
+  const statusEl = document.getElementById("pwStatus");
+  ADMIN_KEY = document.getElementById("pwInput").value.trim();
+  setStatus(statusEl, "info", "Checking…");
+  get("checkAdmin").then(data => {
+    if (data.error) throw new Error(data.error);
+    setStatus(statusEl, "ok", "Access granted.");
+    showScreen("screenMenu");
+  }).catch(err => setStatus(statusEl, "err", "Incorrect password or unreachable: " + err.message));
+});
+
+document.getElementById("goCreate").addEventListener("click", () => { renderPrompt(); showScreen("screenCreate"); });
+document.getElementById("goGrading").addEventListener("click", () => { loadExerciseList(); showScreen("screenGrading"); });
+document.getElementById("backFromCreate").addEventListener("click", () => showScreen("screenMenu"));
+document.getElementById("backFromGrading").addEventListener("click", () => showScreen("screenMenu"));
+
+// ==================== CREATE FLOW ====================
+
+function renderPrompt() {
+  const n = document.getElementById("exNumQuestions").value || 9;
+  const bankSize = document.getElementById("bankSizeInput").value || 150;
+  const prompt =
+`I'm going to give you the content covered in a Python class session for
+first-time programming learners (pasted text and/or attached Jupyter
+notebooks). Based ONLY on what was actually taught, generate two things.
+
+1. SCENARIO BANK — a JSON array of ${bankSize} practice-problem scenarios,
+each with exactly these fields:
+{"category": "<short label you choose based on the content>", "question_text": "<problem statement>"}
+
+Rules:
+- Derive your own category labels from the content — don't assume any fixed
+  list.
+- Every question must be solvable using ONLY the constructs, functions, and
+  library calls that actually appear in the pasted content/notebooks —
+  nothing beyond that scope.
+- General/everyday real-world context (cooking, sports, travel, shopping,
+  hobbies, household tasks) unless the class content itself was
+  domain-specific.
+- Each question_text must be self-contained: state all given values, any
+  needed formula, and the required output precision/format.
+- Vary the framing aggressively — many genuinely different real-world
+  scenarios, even where the underlying formula repeats.
+- Spread roughly evenly across your derived categories.
+
+2. RUBRIC — a JSON array for ${n} graded questions, each:
+{"criterion": "<short name>", "description": "<one sentence>", "max_points": <integer>}
+
+Cover at minimum: correct numerical output, correct use of the specific
+constructs/library calls covered in the content, code clarity, and
+following the stated output format exactly. Point values should sum to a
+clean total.
+
+3. WORKED EXAMPLE — one JSON object (not an array) with exactly these
+fields:
+{"question_text": "<a fully solved example problem statement>", "solution_code": "<complete working Python code that solves it, using only the taught constructs, with comments>"}
+
+This must NOT be one of the ${bankSize} scenarios above — a separate,
+simple example whose only purpose is showing correct syntax/formatting
+style to a first-time learner, ideally touching the same kinds of
+constructs (e.g. the math library, if the bank uses it) as the bank.
+
+Output ONLY three labeled JSON blocks, nothing else:
+SCENARIO_BANK:
+[...]
+
+RUBRIC:
+[...]
+
+WORKED_EXAMPLE:
+{...}
+
+--- CLASS CONTENT BELOW ---
+(paste your notes here, and/or attach the .ipynb file(s))`;
+  document.getElementById("genPromptText").textContent = prompt;
+}
+document.getElementById("exNumQuestions").addEventListener("input", renderPrompt);
+document.getElementById("bankSizeInput").addEventListener("input", renderPrompt);
+document.getElementById("copyPromptBtn").addEventListener("click", () => {
+  navigator.clipboard.writeText(document.getElementById("genPromptText").textContent);
+});
+
+document.getElementById("bankFile").addEventListener("change", (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => { document.getElementById("bankText").value = reader.result; };
+  reader.readAsText(f);
+});
+document.getElementById("rubricFile").addEventListener("change", (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => { document.getElementById("rubricText").value = reader.result; };
+  reader.readAsText(f);
+});
+document.getElementById("workedFile").addEventListener("change", (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => { document.getElementById("workedText").value = reader.result; };
+  reader.readAsText(f);
+});
+
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function distributeCategories(categories, total) {
+  const base = Math.floor(total / categories.length);
+  const rem = total % categories.length;
+  const plan = {};
+  categories.forEach((c, i) => { plan[c] = base + (i < rem ? 1 : 0); });
+  return plan;
+}
+
+document.getElementById("createAllBtn").addEventListener("click", async () => {
+  const statusEl = document.getElementById("createStatus");
+  const logEl = document.getElementById("createLog");
+  logEl.textContent = ""; logEl.style.display = "none";
+
+  const exName = document.getElementById("exName").value.trim();
+  const duration = Number(document.getElementById("exDuration").value);
+  const numQuestions = Number(document.getElementById("exNumQuestions").value);
+  const maxOverlap = Number(document.getElementById("maxOverlap").value);
+
+  let scenarios, criteria, workedExample;
+  try { scenarios = JSON.parse(document.getElementById("bankText").value); }
+  catch (e) { return setStatus(statusEl, "err", "Scenario bank JSON is invalid: " + e.message); }
+  try { criteria = JSON.parse(document.getElementById("rubricText").value); }
+  catch (e) { return setStatus(statusEl, "err", "Rubric JSON is invalid: " + e.message); }
+  try { workedExample = JSON.parse(document.getElementById("workedText").value); }
+  catch (e) { return setStatus(statusEl, "err", "Worked example JSON is invalid: " + e.message); }
+  if (!Array.isArray(scenarios) || !scenarios.length) return setStatus(statusEl, "err", "Scenario bank is empty.");
+  if (!Array.isArray(criteria) || !criteria.length) return setStatus(statusEl, "err", "Rubric is empty.");
+  if (!workedExample || !workedExample.question_text || !workedExample.solution_code) {
+    return setStatus(statusEl, "err", "Worked example must have question_text and solution_code.");
+  }
+
+  scenarios.forEach((s, i) => { s.scenario_id = s.scenario_id || `S${i + 1}`; });
+
+  const exerciseId = `${exName.toLowerCase().replace(/[^a-z0-9]+/g, "_").slice(0, 24)}_${Date.now().toString(36)}`;
+
+  const btn = document.getElementById("createAllBtn");
+  btn.disabled = true;
+  setStatus(statusEl, "info", "Working…");
+
+  try {
+    log(logEl, `Exercise ID: ${exerciseId}`);
+
+    log(logEl, "Creating exercise and auto-enrolling students…");
+    const exRes = await post({
+      action: "createExercise", exercise_id: exerciseId, exercise_name: exName,
+      duration_minutes: duration, num_questions: numQuestions,
+      worked_example_text: workedExample.question_text,
+      worked_example_code: workedExample.solution_code
+    });
+    if (exRes.error) throw new Error(exRes.error);
+    log(logEl, `Enrolled ${exRes.enrolled} student(s) (${exRes.already_enrolled} already present).`);
+
+    log(logEl, "Uploading scenario bank…");
+    const bankRes = await post({ action: "uploadBank", exercise_id: exerciseId, scenarios });
+    if (bankRes.error) throw new Error(bankRes.error);
+    log(logEl, `Bank uploaded: ${bankRes.count} scenarios.`);
+
+    log(logEl, "Uploading rubric…");
+    const rubricRes = await post({ action: "uploadRubric", exercise_id: exerciseId, criteria });
+    if (rubricRes.error) throw new Error(rubricRes.error);
+    log(logEl, `Rubric uploaded: ${rubricRes.count} criteria.`);
+
+    log(logEl, "Loading enrolled roster…");
+    const rosterRes = await get("getRosterAdmin", { exercise_id: exerciseId });
+    if (rosterRes.error) throw new Error(rosterRes.error);
+    const roster = rosterRes.students;
+    if (!roster.length) throw new Error("No students enrolled — check the Students master tab has rows.");
+    log(logEl, `${roster.length} student(s) to assign.`);
+
+    const categories = [...new Set(scenarios.map(s => s.category))].sort();
+    const catPlan = distributeCategories(categories, numQuestions);
+    log(logEl, "Category plan: " + JSON.stringify(catPlan));
+
+    const bankByCat = {};
+    scenarios.forEach(s => { (bankByCat[s.category] = bankByCat[s.category] || []).push(s); });
+    for (const cat in catPlan) {
+      if (!bankByCat[cat] || bankByCat[cat].length < catPlan[cat]) {
+        throw new Error(`Not enough scenarios in category "${cat}" (need ${catPlan[cat]}, have ${(bankByCat[cat]||[]).length}).`);
+      }
+    }
+
+    log(logEl, "Generating per-student assignments…");
+    const assignments = [];
+    const prevIdSets = [];
+    let failedStudent = null;
+
+    for (const student of roster) {
+      let picked = null;
+      for (let attempt = 0; attempt < 400 && !picked; attempt++) {
+        const candidate = [];
+        for (const cat in catPlan) {
+          candidate.push(...shuffle(bankByCat[cat]).slice(0, catPlan[cat]));
+        }
+        const idSet = new Set(candidate.map(s => s.scenario_id));
+        const ok = prevIdSets.every(prev => {
+          let overlap = 0;
+          prev.forEach(id => { if (idSet.has(id)) overlap++; });
+          return overlap <= maxOverlap;
+        });
+        if (ok) picked = candidate;
+      }
+      if (!picked) { failedStudent = student; break; }
+      prevIdSets.push(new Set(picked.map(s => s.scenario_id)));
+      const ordered = shuffle(picked);
+      assignments.push({
+        roll_no: student.roll_no, email: student.email,
+        set_id: `${exerciseId}_${student.roll_no}`,
+        questions: ordered.map((s, i) => ({
+          question_number: i + 1, category: s.category, question_text: s.question_text
+        }))
+      });
+    }
+    if (failedStudent) {
+      throw new Error(`Could not satisfy the overlap constraint for roll_no ${failedStudent.roll_no}. Try a larger bank size or a higher max overlap.`);
+    }
+
+    log(logEl, "Pushing assignments…");
+    const assignRes = await post({ action: "assignSets", exercise_id: exerciseId, assignments });
+    if (assignRes.error) throw new Error(assignRes.error);
+    log(logEl, `${assignRes.sets_written} sets written, ${assignRes.roster_rows_updated} roster rows updated.`);
+
+    setStatus(statusEl, "ok", `Done! "${exName}" (${exerciseId}) is now the current exercise.`);
+  } catch (err) {
+    setStatus(statusEl, "err", err.message);
+    log(logEl, "ERROR: " + err.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ==================== FIX: RE-ENROLL / ASSIGN MISSING ====================
+
+document.getElementById("reEnrollBtn").addEventListener("click", async () => {
+  const statusEl = document.getElementById("reEnrollStatus");
+  const exerciseId = document.getElementById("gradeExerciseSelect").value;
+  if (!exerciseId) return setStatus(statusEl, "err", "Select an exercise first.");
+  setStatus(statusEl, "info", "Re-enrolling…");
+  try {
+    const res = await post({ action: "reEnrollAll", exercise_id: exerciseId });
+    if (res.error) throw new Error(res.error);
+    setStatus(statusEl, "ok",
+      `Enrolled ${res.enrolled} new student(s) (${res.already_enrolled} already present). ` +
+      (res.enrolled > 0 ? `Now click "Assign question sets to newly enrolled students".` : ``));
+  } catch (err) { setStatus(statusEl, "err", err.message); }
+});
+
+document.getElementById("assignMissingBtn").addEventListener("click", async () => {
+  const statusEl = document.getElementById("reEnrollStatus");
+  const exerciseId = document.getElementById("gradeExerciseSelect").value;
+  if (!exerciseId) return setStatus(statusEl, "err", "Select an exercise first.");
+  setStatus(statusEl, "info", "Checking for unassigned students…");
+
+  try {
+    const [cfgRes, rosterRes, bankRes, qsRes] = await Promise.all([
+      get("config", { exercise_id: exerciseId }),
+      get("getRosterAdmin", { exercise_id: exerciseId }),
+      get("getBank", { exercise_id: exerciseId }),
+      get("getQuestionSetsAdmin", { exercise_id: exerciseId })
+    ]);
+    if (cfgRes.error) throw new Error(cfgRes.error);
+    if (rosterRes.error) throw new Error(rosterRes.error);
+    if (bankRes.error) throw new Error(bankRes.error);
+    if (qsRes.error) throw new Error(qsRes.error);
+
+    const missing = rosterRes.students.filter(s => !s.assigned_set_id);
+    if (!missing.length) { setStatus(statusEl, "ok", "No unassigned students — everyone already has a set."); return; }
+
+    const numQuestions = Number(cfgRes.num_questions);
+    const scenarios = bankRes.scenarios;
+    const categories = [...new Set(scenarios.map(s => s.category))].sort();
+    const catPlan = distributeCategories(categories, numQuestions);
+    const bankByCat = {};
+    scenarios.forEach(s => { (bankByCat[s.category] = bankByCat[s.category] || []).push(s); });
+    for (const cat in catPlan) {
+      if (!bankByCat[cat] || bankByCat[cat].length < catPlan[cat]) {
+        throw new Error(`Not enough scenarios in category "${cat}" for one student's set.`);
+      }
+    }
+
+    // Existing sets, used as overlap baseline (matched by question_text since
+    // that's what's stored — a reliable proxy for scenario identity).
+    const setIds = [...new Set(qsRes.question_sets.map(q => q.set_id))];
+    const prevIdSets = setIds.map(sid =>
+      new Set(qsRes.question_sets.filter(q => q.set_id === sid).map(q => q.question_text))
+    );
+
+    const maxOverlap = 2; // fixed default for this recovery path
+    const assignments = [];
+    let failedStudent = null;
+
+    for (const student of missing) {
+      let picked = null;
+      for (let attempt = 0; attempt < 400 && !picked; attempt++) {
+        const candidate = [];
+        for (const cat in catPlan) candidate.push(...shuffle(bankByCat[cat]).slice(0, catPlan[cat]));
+        const idSet = new Set(candidate.map(s => s.question_text));
+        const ok = prevIdSets.every(prev => {
+          let overlap = 0;
+          prev.forEach(t => { if (idSet.has(t)) overlap++; });
+          return overlap <= maxOverlap;
+        });
+        if (ok) picked = candidate;
+      }
+      if (!picked) { failedStudent = student; break; }
+      prevIdSets.push(new Set(picked.map(s => s.question_text)));
+      const ordered = shuffle(picked);
+      assignments.push({
+        roll_no: student.roll_no, email: student.email,
+        set_id: `${exerciseId}_${student.roll_no}`,
+        questions: ordered.map((s, i) => ({ question_number: i + 1, category: s.category, question_text: s.question_text }))
+      });
+    }
+    if (failedStudent) throw new Error(`Could not satisfy overlap constraint for roll_no ${failedStudent.roll_no}.`);
+
+    const assignRes = await post({ action: "assignSets", exercise_id: exerciseId, assignments });
+    if (assignRes.error) throw new Error(assignRes.error);
+    setStatus(statusEl, "ok", `Assigned question sets to ${assignments.length} newly enrolled student(s).`);
+  } catch (err) { setStatus(statusEl, "err", err.message); }
+});
+
+// ==================== GRADING FLOW ====================
+
+function loadExerciseList() {
+  const sel = document.getElementById("gradeExerciseSelect");
+  sel.innerHTML = "<option value=''>Loading…</option>";
+  get("listExercises").then(data => {
+    if (data.error) throw new Error(data.error);
+    sel.innerHTML = data.exercises.map(ex =>
+      `<option value="${ex.exercise_id}" ${String(ex.current).toLowerCase() === "yes" ? "selected" : ""}>
+        ${ex.exercise_name} (${ex.exercise_id})${String(ex.current).toLowerCase() === "yes" ? " — current" : ""}
+      </option>`).join("");
+  }).catch(err => { sel.innerHTML = "<option value=''>Failed to load</option>"; console.error(err); });
+}
+
+function extractCode(notebookJsonText) {
+  try {
+    const nb = JSON.parse(notebookJsonText);
+    return nb.cells
+      .filter(c => c.cell_type === "code")
+      .map((c, i) => `# --- code cell ${i + 1} ---\n` + (Array.isArray(c.source) ? c.source.join("") : c.source))
+      .join("\n\n");
+  } catch (e) {
+    return "[Could not parse notebook JSON: " + e.message + "]";
+  }
+}
+
+document.getElementById("setCurrentBtn").addEventListener("click", async () => {
+  const statusEl = document.getElementById("promptStatus");
+  const exerciseId = document.getElementById("gradeExerciseSelect").value;
+  if (!exerciseId) return setStatus(statusEl, "err", "Select an exercise first.");
+  setStatus(statusEl, "info", "Setting current…");
+  try {
+    const res = await post({ action: "setCurrentExercise", exercise_id: exerciseId });
+    if (res.error) throw new Error(res.error);
+    setStatus(statusEl, "ok", `${exerciseId} is now the current exercise.`);
+    loadExerciseList();
+  } catch (err) { setStatus(statusEl, "err", err.message); }
+});
+
+document.getElementById("buildPromptsBtn").addEventListener("click", async () => {
+  const statusEl = document.getElementById("promptStatus");
+  const outEl = document.getElementById("promptsOutput");
+  outEl.innerHTML = "";
+  const exerciseId = document.getElementById("gradeExerciseSelect").value;
+  if (!exerciseId) return setStatus(statusEl, "err", "Select an exercise first.");
+
+  setStatus(statusEl, "info", "Loading submissions, question sets, and rubric…");
+  try {
+    const [subsData, qsData, rubricData, rosterData] = await Promise.all([
+      get("getSubmissionsAdmin", { exercise_id: exerciseId }),
+      get("getQuestionSetsAdmin", { exercise_id: exerciseId }),
+      get("getRubric", { exercise_id: exerciseId }),
+      get("getRosterAdmin", { exercise_id: exerciseId })
+    ]);
+    if (subsData.error) throw new Error(subsData.error);
+    if (qsData.error) throw new Error(qsData.error);
+    if (rubricData.error) throw new Error(rubricData.error);
+    if (rosterData.error) throw new Error(rosterData.error);
+
+    const submissions = subsData.submissions;
+    if (!submissions.length) { setStatus(statusEl, "err", "No submissions found for this exercise."); return; }
+
+    const setIdByEmail = {};
+    (rosterData.students || []).forEach(s => setIdByEmail[String(s.email).toLowerCase()] = s.assigned_set_id);
+
+    const rubricText = rubricData.criteria.map(c =>
+      `- ${c.criterion} (${c.max_points} pts): ${c.description}`).join("\n");
+
+    submissions.forEach(sub => {
+      const setId = setIdByEmail[String(sub.email).toLowerCase()];
+      const questions = qsData.question_sets
+        .filter(q => String(q.set_id) === String(setId))
+        .sort((a, b) => a.question_number - b.question_number);
+      const qText = questions.map(q => `Q${q.question_number} [${q.category}]: ${q.question_text}`).join("\n");
+      const code = extractCode(sub.notebook_json);
+
+      const prompt =
+`You are grading a first-time Python learner's lab exercise submission.
+
+RUBRIC:
+${rubricText}
+
+ASSIGNED QUESTIONS:
+${qText}
+
+STUDENT'S SUBMITTED CODE (all code cells, in order):
+${code}
+
+Grade each question against the rubric above. For each question, state whether the output/logic is correct, award points per criterion, and give one short line of feedback. End with a total score.`;
+
+      const block = document.createElement("div");
+      block.className = "prompt-block";
+      block.innerHTML = `<h3>${sub.roll_no} — ${sub.email}</h3>
+        <pre>${prompt.replace(/</g, "&lt;")}</pre>
+        <button class="secondary copyBtn">Copy prompt</button>`;
+      block.querySelector(".copyBtn").addEventListener("click", () => {
+        navigator.clipboard.writeText(prompt);
+      });
+      outEl.appendChild(block);
+    });
+
+    setStatus(statusEl, "ok", `Built ${submissions.length} grading prompt(s).`);
+  } catch (err) {
+    setStatus(statusEl, "err", err.message);
+  }
+});
+</script>
+</body>
+</html>
